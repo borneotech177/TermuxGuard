@@ -1,0 +1,68 @@
+name: Android Build
+
+# Cara pakai (TANPA perlu extract manual / upload file satu-satu):
+# 1. Upload file "TermuxGuard.zip" ke root repo ini lewat GitHub web
+#    (Add file > Upload files > pilih TermuxGuard.zip > Commit).
+# 2. Taruh file ini persis di path: .github/workflows/android-build.yml
+#    (Add file > Create new file > ketik path itu > paste isi file ini > Commit).
+# Setelah kedua file ter-commit, workflow ini otomatis jalan: ekstrak
+# TermuxGuard.zip, lalu build APK-nya.
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Extract ZIP & Assemble APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract TermuxGuard.zip into workspace
+        run: |
+          if [ ! -f "TermuxGuard.zip" ]; then
+            echo "::error::TermuxGuard.zip tidak ditemukan di root repo. Upload dulu file itu ke root (bukan ke dalam folder)."
+            exit 1
+          fi
+          unzip -o TermuxGuard.zip -d .
+          echo "Isi workspace setelah ekstrak:"
+          ls -la
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build release APK (unsigned)
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TermuxGuard-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TermuxGuard-release-unsigned-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
